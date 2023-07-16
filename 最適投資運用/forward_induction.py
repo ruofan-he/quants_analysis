@@ -3,7 +3,7 @@ import numpy as np
 if __name__ == '__main__':
     
     c = 0.02; # 取引コスト すなわち 売買手数料では購入や売買額面の(1+c)倍コストがかかるとする。
-    M = 100;
+    M = 100; # 初期資金
     price_process = [[1,1,1,1,1], # Money market account
                      [1,2,1,1,1], # product 1
                      [1,1,1,2,1]] # product 2
@@ -12,7 +12,7 @@ if __name__ == '__main__':
     print(price_process)
 
     money_process = np.zeros_like(price_process)
-    money_process[0,0] = M
+    money_process[0,0] = M # 初期にはMoney market accoutにてMの資金を持つとする。
     
     for t in range(1, len(price_process[0])):
         for i in range(len(price_process)): # to
