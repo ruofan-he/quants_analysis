@@ -2,7 +2,7 @@ import numpy as np
 
 if __name__ == '__main__':
     
-    c = 0.02;
+    c = 0.02; # 取引コスト すなわち 売買手数料では購入や売買額面の(1+c)倍コストがかかるとする。
     M = 100;
     price_process = [[1,1,1,1,1], # Money market account
                      [1,2,1,1,1], # product 1
