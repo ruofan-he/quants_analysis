@@ -1,4 +1,4 @@
-from .hull_white import HullWhiteProcess
-from .hull_white_theta import HullWhiteTheta
+from .hull_white import HullWhiteProcess, HullWhiteTheta
+from .curve import InitialCurve
 
-__all__ = ["HullWhiteProcess", "HullWhiteTheta"]
+__all__ = ["HullWhiteProcess", "HullWhiteTheta","InitialCurve"]

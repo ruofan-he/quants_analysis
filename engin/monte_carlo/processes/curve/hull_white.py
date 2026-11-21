@@ -3,6 +3,35 @@ from scipy.integrate import trapezoid
 from .base import CurveProcess
 
 
+
+class HullWhiteTheta:
+    """Fit the time-dependent Hull-White drift to an initial discount curve."""
+
+    def __init__(self, initial_curve, alpha, sigma):
+        self.initial_curve = initial_curve
+        self.alpha = alpha if callable(alpha) else lambda t: float(alpha)
+        self.sigma = sigma if callable(sigma) else lambda t: float(sigma)
+
+    def theta(self, t):
+        a = self.alpha(t)
+        s = self.sigma(t)
+
+        f = self.initial_curve.fwd_rate(t)
+        dfdt = self.initial_curve.dfwd_dt(t)
+
+        if np.isclose(a, 0.0):
+            return dfdt + s**2 * t
+
+        vol_adjustment = (
+            s**2 / (2.0 * a)
+            * (1.0 - np.exp(-2.0 * a * t))
+        )
+
+        return dfdt + a * f + vol_adjustment
+
+
+
+
 class HullWhiteProcess(CurveProcess):
     """Euler-discretized Hull-White one-factor process."""
 

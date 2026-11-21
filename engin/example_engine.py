@@ -5,6 +5,7 @@ from monte_carlo import (
     HullWhiteProcess,
     HullWhiteTheta,
     BlackScholesProcess,
+    InitialCurve
 )
 
 # Market data / model parameters are assembled outside the engine.
@@ -13,10 +14,15 @@ dfs = [1.0, 0.99, 0.975, 0.94, 0.85, 0.70]
 
 alpha_r = 0.1
 sigma_r = 0.01
-theta_model = HullWhiteTheta(times, dfs, alpha_r, sigma_r)
+
+
+
+initial_curve = InitialCurve(times, dfs)
+theta_model = HullWhiteTheta(initial_curve, alpha_r, sigma_r)
+
 
 rate = HullWhiteProcess(
-    initial_value=0.01,
+    initial_value=initial_curve.fwd_rate(0),
     alpha=alpha_r,
     sigma=sigma_r,
     theta=theta_model.theta,
