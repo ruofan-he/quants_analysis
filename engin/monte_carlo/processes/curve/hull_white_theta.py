@@ -31,12 +31,18 @@ class HullWhiteTheta:
     def theta(self, t):
         a = self.alpha(t)
         s = self.sigma(t)
-        if np.isclose(a, 0.0):
-            raise ValueError("This theta implementation assumes non-zero mean reversion alpha")
+
         f = self.fwd_rate(t)
         dfdt = self.dfwd_dt(t)
-        dvar_dt = 2.0 * s**2 / a * (1.0 - np.exp(-a*t)) * np.exp(-a*t)
-        return dfdt + a*f + 0.5*dvar_dt
+        if np.isclose(a, 0.0):
+            return dfdt + s**2 * t
+
+        vol_adjustment = (
+            s**2 / (2.0 * a)
+            * (1.0 - np.exp(-2.0 * a * t))
+        )
+
+        return dfdt + a * f + vol_adjustment
 
     def df(self, t):
         return np.exp(self.log_df_spline(t))

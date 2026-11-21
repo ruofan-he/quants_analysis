@@ -17,6 +17,11 @@ class HullWhiteProcess(CurveProcess):
         s = self.sigma(t)
         return x + (self.theta(t) - a*x)*dt + s*dW
 
+    def discount_rate(self, t1, t2, x1):
+        """Rate used to accumulate a discount/survival factor."""
+
+        return x1
+
     def B(self, t, maturity):
         a = self.alpha(t)
         tau = np.asarray(maturity) - t
@@ -24,7 +29,7 @@ class HullWhiteProcess(CurveProcess):
             return tau
         return -np.expm1(-a*tau) / a
 
-    def A(self, t, maturity, n_int=101):
+    def A(self, t, maturity, n_int=201):
         """Log-A term for P(t,T)=exp(A(t,T)-B(t,T)*x_t)."""
         if t >= maturity:
             return 0.0

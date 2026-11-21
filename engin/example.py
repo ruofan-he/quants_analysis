@@ -57,12 +57,12 @@ S = result["paths"]["stock"]
 r = result["paths"]["rate"]
 hazard_rate = result["paths"]["hazard"]
 df = result["discount_factors"]
+t = result["time"]
 
 call_price = np.mean(df[:, -1] * np.maximum(S[:, -1] - 100.0, 0.0))
 print("Call price:", call_price)
 
 # Hull-White zero-coupon bond values at each simulation time.
-t = result["time"]
 zcb = np.column_stack([
     rate.zcb(float(ti), r[:, i], maturity=5.0)
     for i, ti in enumerate(t)

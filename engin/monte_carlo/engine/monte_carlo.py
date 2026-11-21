@@ -1,5 +1,6 @@
 import numpy as np
 from ..random.correlated import CorrelatedBrownian
+from scipy.integrate import trapezoid
 
 
 class MonteCarloEngine:
@@ -66,12 +67,14 @@ class MonteCarloEngine:
                 )
 
             if discount_factors is not None:
-                rate = self.processes[self.discount_curve_key].discount_rate(
-                    paths[self.discount_curve_key][:, i]
-                )
+                rate1 = paths[self.discount_curve_key][:, i]
+                t1 = self.time_grid[i]
+                t2 = self.time_grid[i + 1]
+                rate = self.processes[self.discount_curve_key].discount_rate(t1, t2, rate1)
                 discount_factors[:, i + 1] = (
                     discount_factors[:, i] * np.exp(-rate*self.dt)
                 )
+
 
         result = {"time": self.time_grid, "paths": paths}
         if discount_factors is not None:
