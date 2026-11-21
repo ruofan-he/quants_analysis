@@ -2,10 +2,52 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import numpy as np
 
+
+class Portfolio:
+
+    def __init__(self, products):
+
+        if isinstance(products, dict):
+            self.products = dict(products)
+
+        else:
+            self.products = {
+                f"{type(p).__name__}_{i}": p
+                for i, p in enumerate(products)
+            }
+
+        if not self.products:
+            raise ValueError("Empty portfolio")
+
+        for name, product in self.products.items():
+            if not isinstance(product, Product):
+                raise TypeError(
+                    f"{name} is not a Product"
+                )
+
+    def __iter__(self):
+        return iter(self.products.items())
+
+    def __len__(self):
+        return len(self.products)
+
+
 @dataclass
 class Cashflow:
     payment_time: float
     amount: object  # scalar or (n_paths,)
+
+
+def interpolate_market(time_grid, paths, t):
+
+    time_grid = np.asarray(time_grid)
+    paths = np.asarray(paths)
+
+    return np.array([
+        np.interp(t, time_grid, path)
+        for path in paths
+    ])
+
 
 class Product(ABC):
     def __init__(self, discount_curve="rate"):
@@ -64,9 +106,20 @@ class EquityForward(Product):
         return (self.spot_factor,)
 
     def cashflows(self, market):
-        i = grid_index(market["time"], self.maturity)
-        s = market["paths"][self.spot_factor][:, i]
-        return [Cashflow(self.maturity, self.quantity*(s-self.delivery_price))]
+
+        S = interpolate_market(
+            market["time"],
+            market["paths"][self.spot_factor],
+            self.maturity,
+        )
+
+        payoff = self.quantity * (
+            S - self.delivery_price
+        )
+
+        return [
+            Cashflow(self.maturity, payoff)
+        ]
 
 
 class IRS(Product):
@@ -76,6 +129,7 @@ class IRS(Product):
         super().__init__(discount_curve)
         self.notional, self.fixed_rate = float(notional), float(fixed_rate)
         self.periods = tuple((float(a),float(b)) for a,b in accrual_periods)
+        self.accrual_periods = self.periods
         self.pay_fixed, self.rate_factor = bool(pay_fixed), rate_factor
         if not self.periods or any(b <= a for a,b in self.periods):
             raise ValueError("Invalid accrual_periods")
@@ -85,14 +139,61 @@ class IRS(Product):
         return (self.rate_factor,)
 
     def cashflows(self, market):
-        grid, r = market["time"], market["paths"][self.rate_factor]
-        out = []
-        for start, end in self.periods:
-            i0, i1 = grid_index(grid,start), grid_index(grid,end)
-            dts = np.diff(grid[i0:i1+1])
-            growth = np.prod(1.0 + r[:,i0:i1]*dts[None,:], axis=1)
-            floating = self.notional*(growth-1.0)
-            fixed = self.notional*self.fixed_rate*(end-start)
-            net = floating-fixed if self.pay_fixed else fixed-floating
-            out.append(Cashflow(end, net))
-        return out
+
+        grid = np.asarray(market["time"])
+        rates = market["paths"][self.rate_factor]
+
+        result = []
+
+        for start, end in self.accrual_periods:
+
+            # 期間内の既存グリッドを取得
+            interior = grid[
+                (grid > start) & (grid < end)
+            ]
+
+            # 期間境界を含む評価グリッド
+            sub_grid = np.concatenate([
+                [start],
+                interior,
+                [end],
+            ])
+
+            # 各時点の金利パスを補間
+            sub_rates = np.column_stack([
+                interpolate_market(
+                    grid, rates, t
+                )
+                for t in sub_grid
+            ])
+
+            # 短期金利の積分
+            integrated_rate = np.trapezoid(
+                0.5 * (
+                    sub_rates[:, :-1]
+                    + sub_rates[:, 1:]
+                ),
+                x=sub_grid,
+                axis=1,
+            )
+
+            floating_coupon = self.notional * (
+                np.exp(integrated_rate) - 1.0
+            )
+
+            fixed_coupon = (
+                self.notional
+                * self.fixed_rate
+                * (end - start)
+            )
+
+            if self.pay_fixed:
+                net = floating_coupon - fixed_coupon
+            else:
+                net = fixed_coupon - floating_coupon
+
+            result.append(
+                Cashflow(end, net)
+            )
+
+        return result
