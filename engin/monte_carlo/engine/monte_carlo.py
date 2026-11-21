@@ -68,9 +68,10 @@ class MonteCarloEngine:
 
             if discount_factors is not None:
                 rate1 = paths[self.discount_curve_key][:, i]
+                rate2 = paths[self.discount_curve_key][:, i + 1]
                 t1 = self.time_grid[i]
                 t2 = self.time_grid[i + 1]
-                rate = self.processes[self.discount_curve_key].discount_rate(t1, t2, rate1)
+                rate = self.processes[self.discount_curve_key].discount_rate(t1, t2, rate1, rate2)
                 discount_factors[:, i + 1] = (
                     discount_factors[:, i] * np.exp(-rate*self.dt)
                 )

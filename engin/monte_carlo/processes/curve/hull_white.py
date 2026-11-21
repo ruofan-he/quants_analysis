@@ -15,12 +15,23 @@ class HullWhiteProcess(CurveProcess):
     def step(self, t, x, dt, dW, context=None):
         a = self.alpha(t)
         s = self.sigma(t)
-        return x + (self.theta(t) - a*x)*dt + s*dW
 
-    def discount_rate(self, t1, t2, x1):
+        theta_t = self.theta(t)
+        theta_next = self.theta(t + dt)
+
+        # Predictor
+        x_pred = x + (theta_t - a*x)*dt + s*dW
+
+        # Corrector
+        return x + (
+            (theta_t - a*x)
+            + (theta_next - a*x_pred)
+    ) * 0.5 * dt + s*dW
+
+    def discount_rate(self, t1, t2, x1, x2):
         """Rate used to accumulate a discount/survival factor."""
 
-        return x1
+        return 0.5 * (x1 + x2)
 
     def B(self, t, maturity):
         a = self.alpha(t)

@@ -12,5 +12,5 @@ class CurveProcess(ABC):
     def step(self, t, x, dt, dW, context=None):
         """Advance factor state by one time step."""
 
-    def discount_rate(self, t1, t2, x1):
+    def discount_rate(self, t1, t2, x1, x2):
         """Rate used to accumulate a discount/survival factor."""
