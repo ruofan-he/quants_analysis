@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.integrate import trapezoid
+from scipy.integrate import quad
+from scipy.interpolate import CubicSpline
 from .base import CurveProcess
 
 
@@ -7,27 +9,57 @@ from .base import CurveProcess
 class HullWhiteTheta:
     """Fit the time-dependent Hull-White drift to an initial discount curve."""
 
-    def __init__(self, initial_curve, alpha, sigma):
+    def __init__(
+        self,
+        initial_curve,
+        alpha,
+        sigma,
+        max_time=50.0,
+        grid_step=0.01,
+    ):
         self.initial_curve = initial_curve
         self.alpha = alpha if callable(alpha) else lambda t: float(alpha)
         self.sigma = sigma if callable(sigma) else lambda t: float(sigma)
 
-    def theta(self, t):
-        a = self.alpha(t)
-        s = self.sigma(t)
+        # Precompute theta on a time grid
+        self.times = np.arange(0.0, max_time + grid_step, grid_step)
+
+        self.theta_values = np.array([self.theta_impl(t) for t in self.times])
+
+        # Interpolation
+        self._theta_spline = CubicSpline(
+            self.times,
+            self.theta_values,
+            extrapolate=True,
+        )
+
+    def theta_impl(self, t):
+        """Calculate theta(t) directly using numerical integration."""
 
         f = self.initial_curve.fwd_rate(t)
         dfdt = self.initial_curve.dfwd_dt(t)
 
-        if np.isclose(a, 0.0):
-            return dfdt + s**2 * t
+        def integrand(u):
+            alpha_integral, _ = quad(
+                self.alpha, u, t
+            )
 
-        vol_adjustment = (
-            s**2 / (2.0 * a)
-            * (1.0 - np.exp(-2.0 * a * t))
+            return (
+                self.sigma(u) ** 2
+                * np.exp(-2.0 * alpha_integral)
+            )
+
+        vol_adjustment, _ = quad(integrand, 0.0, t)
+
+        return (
+            dfdt
+            + self.alpha(t) * f
+            + vol_adjustment
         )
 
-        return dfdt + a * f + vol_adjustment
+    def theta(self, t):
+        """Return interpolated theta(t)."""
+        return self._theta_spline(t)
 
 
 
@@ -63,11 +95,13 @@ class HullWhiteProcess(CurveProcess):
         return 0.5 * (x1 + x2)
 
     def B(self, t, maturity):
-        a = self.alpha(t)
-        tau = np.asarray(maturity) - t
-        if np.isclose(a, 0.0):
-            return tau
-        return -np.expm1(-a*tau) / a
+        def integrand(u):
+            alpha_integral, _ = quad(
+                self.alpha, t, u
+            )
+            return np.exp(-alpha_integral)
+
+        return quad(integrand, t, maturity)[0]
 
     def A(self, t, maturity, n_int=201):
         """Log-A term for P(t,T)=exp(A(t,T)-B(t,T)*x_t)."""
@@ -75,7 +109,7 @@ class HullWhiteProcess(CurveProcess):
             return 0.0
 
         u = np.linspace(t, maturity, n_int)
-        b = self.B(u, maturity)
+        b = np.asarray([self.B(float(ui), maturity) for ui in u])
         theta_values = np.asarray([self.theta(float(x)) for x in u])
         sigma_values = np.asarray([self.sigma(float(x)) for x in u])
 
